@@ -31,7 +31,7 @@
   const KEYS = { price: 'price', complain: 'complain', becca: 'becca', ann: 'ann', keep: 'retention', cookies: 'cookie' };
   /* ---------- spelling: fix typos before searching ---------- */
   const FIX = { recieve: 'receive', recieved: 'received', reciept: 'receipt', reciepts: 'receipts', seperate: 'separate', acount: 'account', acounts: 'accounts', accout: 'account', accouts: 'accounts', acountant: 'accountant', accoutant: 'accountant', acountants: 'accountants', buisness: 'business', busness: 'business', bussiness: 'business', busines: 'business', bookeeping: 'bookkeeping', bookkeping: 'bookkeeping', bookeping: 'bookkeeping', bokkeeping: 'bookkeeping', bookeeper: 'bookkeeper', payrole: 'payroll', payrol: 'payroll', assesment: 'assessment', assessmant: 'assessment', asessment: 'assessment', expences: 'expenses', expence: 'expense', morgage: 'mortgage', mortage: 'mortgage', mortguage: 'mortgage', compnay: 'company', comapny: 'company', limted: 'limited', limitied: 'limited', definately: 'definitely', tomorow: 'tomorrow', whats: 'what is', wat: 'what', wot: 'what', u: 'you', ur: 'your', r: 'are', pls: 'please', plz: 'please', thx: 'thanks', ty: 'thank you', vat: 'vat', hmrc: 'hmrc', paye: 'paye', cis: 'cis', mtd: 'mtd', p11d: 'p11d' };
-  const EXTRA = 'hello thanks please help need want much many cost costs price business company companies work self employed freelance contractor contractors invoice invoices receipt receipts expense expenses mileage pension dividend dividends salary director directors partner partnership sole trader limited accountant accountants accounting bookkeeping bookkeeper payroll mortgage property landlord landlords rental income tax taxes return returns deadline deadlines penalty penalties refund rebate register registration registered start starting startup switch switching change changing software xero quickbooks freeagent cloud spreadsheet bank statement statements meeting appointment office phone email address location plymouth exeter devon cornwall truro newquay bodmin camborne redruth falmouth penzance';
+  const EXTRA = 'hello thanks please help need want much many cost costs price business company companies work self employed freelance contractor contractors invoice invoices receipt receipts expense expenses mileage pension dividend dividends salary director directors partner partnership sole trader limited accountant accountants accounting bookkeeping bookkeeper payroll mortgage property landlord landlords rental income tax taxes return returns deadline deadlines penalty penalties refund rebate register registration registered start starting startup switch switching change changing software xero quickbooks freeagent cloud spreadsheet bank statement statements meeting appointment office phone email address location plymouth exeter devon cornwall truro newquay bodmin camborne redruth falmouth penzance prime minister president king queen government weather football rugby cricket sport sports game games joke jokes life news film films movie music song recipe recipes holiday holidays travel hotel restaurant dog cat pet health doctor school university love date dating';
   let VOC = null;
   const vocab = () => {
     if (VOC) return VOC;
@@ -79,6 +79,7 @@
     .replace(/\bbook[\s-]+keep(ing|er|ers)?\b/gi, (m, x) => 'bookkeep' + (x || 'ing'))
     .replace(/\bpay[\s-]+roll\b/gi, 'payroll')
     .replace(/[A-Za-z0-9’']+/g, (w) => (/[’'0-9]/.test(w) ? w : fixWord(w)));
+  const DOMAIN = new Set(toks('account accounts accountancy accountant accounting audit audits tax taxes taxed vat payroll paye bookkeeping bookkeeper books hmrc invoice invoices pension pensions profit profits loss losses company companies ltd limited business businesses self employed selfemployed assessment expense expenses receipt receipts mortgage dividend dividends salary wage wages insurance return returns deadline deadlines fee fees price prices cost costs quote quotes charge xero quickbooks freeagent software cloud cis p11d mtd digital budget budgets forecast forecasts cash flow bank loan loans grant grants invest investment property properties landlord landlords rent rental capital gains inheritance payment payments director directors sole trader soletrader partnership partners charity money finance finances financial record records contact zen becca ann team service services advice adviser advisor allowance allowances threshold rates rate refund rebate penalty penalties employee employees staff pay paid register registration utr ni national corporation income turnover vehicle mileage car van equipment asset assets depreciation statement statements reconciliation reconcile year end yearend accounts portal login documents upload id identity aml gdpr privacy cookie cookies complaint complain switch switching industry industries retail hospitality care startup startups influencer garage manufacturing professional sole formation secretarial structure enquiry enquiries investigation guide guides download newsletter'));
   const search = (q) => {
     const qt = [...new Set(toks(q))]; if (!qt.length) return [];
     return KB.map((e) => { const set = new Set(e.t); let s = 0; qt.forEach((w) => { if (set.has(w)) s += idf(w); }); const cover = qt.filter((w) => set.has(w)).length / qt.length; return { e, s: s * (0.6 + cover) * (e.boost || 1) / Math.sqrt(1 + set.size / 25) }; })
@@ -223,7 +224,12 @@
     for (const [re, html] of SMALL) if (re.test(q) && q.split(/\s+/).length <= 6) { push({ who: 'bot', html }); return setChips(START.slice(0, 3)); }
     const res = search(q);
     const top = res[0], second = res[1];
-    if (top && top.s >= 2.2) {
+    const qtk = [...new Set(toks(q))];
+    const wsum = qtk.reduce((n, w) => n + idf(w), 0) || 1;
+    const cov = top ? qtk.filter((w) => top.e.t.includes(w)).reduce((n, w) => n + idf(w), 0) / wsum : 0;
+    const onTopic = qtk.some((w) => DOMAIN.has(w));
+    const passage = !!top && /^p-/.test(top.e.id);
+    if (top && top.s >= 2.2 && (onTopic || cov >= 0.45 && !passage)) {
       const caveat = ADVICE.test(q) ? '<p><em>This is general information. For advice on your own situation, it’s best to speak to a member of the team.</em></p>' : '';
       push({ who: 'bot', html: top.e.a + caveat, links: top.e.links });
       const more = res.slice(1, 4).filter((r) => r.s > top.s * 0.55 && r.e.q && r.e.q !== top.e.q).map((r) => r.e.q);
@@ -235,6 +241,12 @@
         const j = await r.json();
         if (j && j.answer) { push({ who: 'bot', html: `<p>${esc(j.answer).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>` }); return setChips(['Leave a message for the team', 'Book a free call']); }
       } catch (e) { /* fall through */ }
+    }
+    if (qtk.length && !onTopic && (cov < 0.45 || passage || !top || top.s < 2.2)) {
+      push({ who: 'bot', html: '<p>That doesn’t sound like something an accountancy practice like ours can help with, so I don’t think I’m the right person to answer it. If you’d still like an answer, I can pass your question to a member of the team.</p>' });
+      setChips(['Leave a message for the team', 'What services do you offer?']);
+      window.__beccaLast = asked;
+      return;
     }
     if (top && top.s >= 1.1) {
       push({ who: 'bot', html: '<p>I’m not completely sure I’ve understood. Did you mean one of these?</p>' });
