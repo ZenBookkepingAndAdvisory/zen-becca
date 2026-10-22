@@ -179,7 +179,7 @@
     if (p.indexOf('/accountant-') === 0 || p === '/areas') return { name: 'local support', chips: ['Do you meet in person?', 'How do I get started?'] };
     return null;
   };
-  const START = ['How much do you charge?', 'Does MTD apply to me?', 'What is the dividend allowance?', 'What are the tax deadlines?', 'Book a free call'];
+  const START = ['How much do you charge?', 'Can I switch from my current accountant?', 'Does MTD apply to me?', 'What is the dividend allowance?', 'What are the tax deadlines?', 'Book a free call'];
   const greet = () => {
     const c = pageContext();
     push({ who: 'bot', html: `<p>Hi, I’m Becca from the Zen team.</p><p>${c ? `I see you’re looking at ${esc(c.name)}. ` : ''}I can answer quick questions about our services, prices, deadlines, tax rates and how we work. What can I help with?</p>` });
